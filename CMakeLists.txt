@@ -1,5 +1,16 @@
 cmake_minimum_required(VERSION 3.25)
 
+# vcpkg: de toolchain moet gezet zijn vóór project(). Zo werkt het ook in een
+# CLion-profiel zonder losse CMake options, zolang VCPKG_ROOT is ingesteld.
+if(NOT DEFINED ENV{VCPKG_ROOT})
+    message(FATAL_ERROR "Environment variable VCPKG_ROOT is not set. Install vcpkg and set VCPKG_ROOT (see DEVELOPMENT_SETUP.md, section 5).")
+endif()
+
+if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
+    set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+            CACHE STRING "vcpkg toolchain file")
+endif()
+
 # The project does not use C++20 modules. Leave module dependency scanning
 # off (CMake enables it by default for C++20+GCC and then injects GCC-only
 # flags like -fmodules-ts into every compile, which clangd cannot parse).
@@ -21,10 +32,6 @@ option(ENGINE_ENABLE_SANITIZERS "Enable AddressSanitizer and UndefinedBehaviorSa
 
 add_library(project_warnings INTERFACE)
 
-if(NOT DEFINED ENV{VCPKG_ROOT})
-    message(FATAL_ERROR "Environment variable VCPKG_ROOT is not set. Install vcpkg and set VCPKG_ROOT (see DEVELOPMENT_SETUP.md, section 5).")
-endif()
-
 if(MSVC)
     target_compile_options(project_warnings INTERFACE /W4 /WX)
 else()
@@ -37,6 +44,10 @@ if(ENGINE_ENABLE_SANITIZERS AND NOT MSVC AND NOT MINGW)
     target_compile_options(project_sanitizers INTERFACE -fsanitize=address,undefined)
     target_link_options(project_sanitizers INTERFACE -fsanitize=address,undefined)
 endif()
+
+# Third-party dependencies (geïnstalleerd door vcpkg, zie vcpkg.json)
+find_package(SDL2 CONFIG REQUIRED)
+find_package(SDL2_mixer CONFIG REQUIRED)
 
 add_subdirectory(engine)
 add_subdirectory(game)
