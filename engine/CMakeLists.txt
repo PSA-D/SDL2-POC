@@ -1,29 +1,29 @@
-cmake_minimum_required(VERSION 3.25)
-
 add_library(engine STATIC
-        src/core/Engine.cpp
-        src/graphics/Window.cpp
-        src/graphics/Renderer.cpp
-        src/graphics/Window.cpp
-        src/graphics/Window.h
-        src/graphics/Window.h
-        src/graphics/Renderer.cpp
-        src/graphics/Renderer.h
+    src/systems/MovementSystem.cpp
+    src/systems/BounceSystem.cpp
+    src/systems/ParticleSystem.cpp
+    src/systems/RenderSystem.cpp
+    src/audio/AdaptiveMusic.cpp
+
+    # Implementatie achter de facade, compile-time gekozen met ENGINE_BACKEND
+    src/graphics/${ENGINE_BACKEND}/Window.cpp
+    src/graphics/${ENGINE_BACKEND}/Renderer.cpp
+    src/input/${ENGINE_BACKEND}/Input.cpp
+    src/audio/${ENGINE_BACKEND}/AudioFactory.cpp
+    src/audio/${ENGINE_BACKEND}/SdlCoreAudioBackend.cpp
+    src/audio/${ENGINE_BACKEND}/SdlMixerAudioBackend.cpp
 )
 
-target_include_directories(engine PUBLIC
-        include
-        src
+target_include_directories(engine PUBLIC src)
+
+# SDL is PRIVATE: code die de engine gebruikt (game/) kan geen SDL-headers includen.
+# vcpkg levert op sommige platforms alleen de -static targets (bv. arm64-osx), vandaar de $<IF:...>.
+target_link_libraries(engine PRIVATE
+    $<IF:$<TARGET_EXISTS:SDL2::SDL2>,SDL2::SDL2,SDL2::SDL2-static>
+    $<IF:$<TARGET_EXISTS:SDL2_mixer::SDL2_mixer>,SDL2_mixer::SDL2_mixer,SDL2_mixer::SDL2_mixer-static>
+    project_sanitizers
+    project_warnings
 )
 
-target_link_libraries(engine PUBLIC
-        SDL2::SDL2
-        SDL2_mixer::SDL2_mixer
-        project_sanitizers
-        project_warnings
-)
-
-# We gebruiken zelf `auto main() -> int`, dus SDL2main laten we achterwege.
-target_compile_definitions(engine PUBLIC SDL_MAIN_HANDLED)
-
-target_compile_features(engine PUBLIC cxx_std_20)
+# We hebben een gewone main() en gebruiken SDL2main dus niet.
+target_compile_definitions(engine PRIVATE SDL_MAIN_HANDLED)

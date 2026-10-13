@@ -27,8 +27,10 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-option(ENGINE_BUILD_TESTS "Build tests" ON)
 option(ENGINE_ENABLE_SANITIZERS "Enable AddressSanitizer and UndefinedBehaviorSanitizer" ON)
+
+# Welke implementatie achter de facade zit (map <module>/<ENGINE_BACKEND>/). In deze PoC alleen sdl2.
+set(ENGINE_BACKEND "sdl2" CACHE STRING "Engine backend")
 
 add_library(project_warnings INTERFACE)
 
@@ -51,8 +53,3 @@ find_package(SDL2_mixer CONFIG REQUIRED)
 
 add_subdirectory(engine)
 add_subdirectory(game)
-
-if(ENGINE_BUILD_TESTS)
-    enable_testing()
-    add_subdirectory(tests)
-endif()

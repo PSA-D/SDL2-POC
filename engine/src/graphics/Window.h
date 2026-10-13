@@ -1,11 +1,12 @@
 #pragma once
 
-#include <SDL.h>
+#include <cstdint>
 #include <memory>
 #include <string>
 
 namespace engine::graphics
 {
+// Facade: geen SDL-types in deze header. De implementatie staat in graphics/<ENGINE_BACKEND>/Window.cpp.
 class Window
 {
 public:
@@ -13,22 +14,17 @@ public:
     ~Window();
 
     Window(const Window&) = delete;
-    auto operator=(const Window&) -> Window& = delete;
+    Window& operator=(const Window&) = delete;
     Window(Window&&) = delete;
-    auto operator=(Window&&) -> Window& = delete;
+    Window& operator=(Window&&) = delete;
 
-    [[nodiscard]] SDL_Window* handle() const;
-    [[nodiscard]] int width() const;
-    [[nodiscard]] int height() const;
+    void setTitle(const std::string& title);
+
+    // Id waarmee de Renderer (zelfde backend) het onderliggende venster terugvindt.
+    [[nodiscard]] std::uint32_t id() const;
 
 private:
-    struct SdlWindowDeleter
-    {
-        void operator()(SDL_Window* sdlWindow) const;
-    };
-
-    std::unique_ptr<SDL_Window, SdlWindowDeleter> window;
+    struct Impl;
+    std::unique_ptr<Impl> impl;
 };
-}
-
-
+} // namespace engine::graphics

@@ -1,19 +1,22 @@
-#include "Engine.h"
+#include "DemoApp.h"
 
 #include <cstdlib>
+#include <exception>
 #include <iostream>
 
-auto main() -> int
+int main()
 {
-    engine::Engine gameEngine;
-    gameEngine.init();
-
-    while (gameEngine.isRunning())
+    try
     {
-        // Game loop placeholder
-        std::cout << "Engine is running\n";
-        gameEngine.shutdown();
+        std::cout
+            << "Toetsen: 1/2 effect | pijl omhoog/omlaag niveau | spatie geluid | A audio-backend | Esc stoppen\n";
+        game::DemoApp app;
+        app.run();
+        return EXIT_SUCCESS;
     }
-
-    return EXIT_SUCCESS;
+    catch (const std::exception& error)
+    {
+        std::cerr << "Fout: " << error.what() << '\n';
+        return EXIT_FAILURE;
+    }
 }

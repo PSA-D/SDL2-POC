@@ -1,43 +1,31 @@
 #pragma once
 
+#include "graphics/Color.h"
 #include "graphics/Window.h"
+#include "utils/Math.h"
 
-#include <SDL.h>
-
-#include <cstdint>
 #include <memory>
 
 namespace engine::graphics
 {
-struct Color
-{
-    std::uint8_t r{0};
-    std::uint8_t g{0};
-    std::uint8_t b{0};
-    std::uint8_t a{255};
-};
-
+// Facade: geen SDL-types in deze header. De implementatie staat in graphics/<ENGINE_BACKEND>/Renderer.cpp.
 class Renderer
 {
 public:
     explicit Renderer(const Window& window);
-    ~Renderer() = default;
+    ~Renderer();
 
     Renderer(const Renderer&) = delete;
-    auto operator=(const Renderer&) -> Renderer& = delete;
+    Renderer& operator=(const Renderer&) = delete;
     Renderer(Renderer&&) = delete;
-    auto operator=(Renderer&&) -> Renderer& = delete;
+    Renderer& operator=(Renderer&&) = delete;
 
-    void clear(Color color) const;
-    void present() const;
-    [[nodiscard]] SDL_Renderer* handle() const;
+    void clear(Color color);
+    void fillRect(utils::Vec2 position, utils::Vec2 size, Color color);
+    void present();
 
 private:
-    struct SdlRendererDeleter
-    {
-        void operator()(SDL_Renderer* sdlRenderer) const;
-    };
-
-    std::unique_ptr<SDL_Renderer, SdlRendererDeleter> renderer;
+    struct Impl;
+    std::unique_ptr<Impl> impl;
 };
 } // namespace engine::graphics

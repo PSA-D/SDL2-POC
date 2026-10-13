@@ -1,0 +1,290 @@
+@startuml SDL2-PoC-klassendiagram
+' Klassendiagram van de SDL2 Proof of Concept.
+' Bekijken: PlantUML-plugin in CLion, of https://www.plantuml.com/plantuml
+
+title SDL2 PoC - klassendiagram
+
+set separator none
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+skinparam shadowing false
+hide empty members
+left to right direction
+
+legend top right
+  |= Kleur |= Betekenis |
+  | <back:#E8F1FB>   </back> | engine, backend-onafhankelijk (geen SDL) |
+  | <back:#FDECEA>   </back> | engine, SDL2-implementatie (mappen sdl2/) |
+  | <back:#EAF7EA>   </back> | game (demo) |
+endlegend
+
+' ===================== engine/src/core =====================
+package "engine::core" #E8F1FB {
+  class "Entity = uint32_t" as Entity <<alias>>
+
+  interface IComponentPool {
+    + remove(entity)
+  }
+
+  class "ComponentPool<T>" as ComponentPool <<sparse set>> {
+    - sparse : vector<size_t>
+    - entities : vector<Entity>
+    - components : vector<T>
+    + add(entity, args...) : T&
+    + remove(entity)
+    + contains(entity) : bool
+    + get(entity) : T&
+    + entityList() : vector<Entity>
+    + size() : size_t
+  }
+
+  class Registry {
+    - pools : unordered_map<type_index, unique_ptr<IComponentPool>>
+    - pendingDestroy : vector<Entity>
+    - freeEntities : vector<Entity>
+    - nextEntity : Entity
+    + create() : Entity
+    + destroyLater(entity)
+    + flush()
+    + clear()
+    + add<T>(entity, args...) : T&
+    + get<T>(entity) : T&
+    + has<T>(entity) : bool
+    + count<T>() : size_t
+    + each<First, Rest...>(func)
+  }
+
+  class Clock {
+    - last : steady_clock::time_point
+    + tick() : float
+  }
+}
+
+ComponentPool ..|> IComponentPool
+Registry *-- "0..*" IComponentPool : pools >
+Registry ..> Entity : maakt >
+
+' ===================== engine/src/components =====================
+package "engine::components (alleen data)" #E8F1FB {
+  struct Transform {
+    + position : Vec2
+  }
+  struct Velocity {
+    + linear : Vec2
+  }
+  struct Sprite {
+    + size : Vec2
+    + color : Color
+  }
+  struct Particle {
+    + age : float
+    + lifetime : float
+  }
+  struct ParticleEmitter {
+    + ratePerSecond : float
+    + accumulator : float
+  }
+}
+
+' ===================== engine/src/systems =====================
+package "engine::systems" #E8F1FB {
+  class MovementSystem {
+    + {static} update(registry, dt)
+  }
+  class BounceSystem {
+    + {static} update(registry, bounds)
+  }
+  class ParticleSystem {
+    - random : mt19937
+    + update(registry, dt)
+    - spawn(registry, position)
+  }
+  class RenderSystem {
+    + {static} update(registry, renderer)
+  }
+}
+
+MovementSystem ..> Transform
+MovementSystem ..> Velocity
+BounceSystem ..> Transform
+BounceSystem ..> Velocity
+BounceSystem ..> Sprite
+ParticleSystem ..> ParticleEmitter
+ParticleSystem ..> Particle : maakt / verwijdert >
+RenderSystem ..> Transform
+RenderSystem ..> Sprite
+
+' ===================== engine/src/graphics + input (facade) =====================
+package "engine::graphics" #E8F1FB {
+  class Window <<facade>> {
+    - impl : unique_ptr<Impl>
+    + Window(title, width, height)
+    + setTitle(title)
+    + id() : uint32
+  }
+  class Renderer <<facade>> {
+    - impl : unique_ptr<Impl>
+    + Renderer(window)
+    + clear(color)
+    + fillRect(position, size, color)
+    + present()
+  }
+  struct Color {
+    + r, g, b, a : uint8
+  }
+}
+
+package "engine::input" #E8F1FB {
+  struct Event {
+    + type : EventType
+    + key : Key
+    + mouse : Vec2
+  }
+  enum EventType {
+    Quit
+    KeyDown
+    MouseMotion
+  }
+  enum Key {
+    Unknown
+    Num1
+    Num2
+    Up
+    Down
+    Space
+    A
+    Escape
+  }
+  class "pollEvent()" as PollEvent <<function>> {
+    + returns optional<Event>
+  }
+}
+
+Renderer ..> Window : id() >
+RenderSystem ..> Renderer : tekent via >
+PollEvent ..> Event : geeft >
+Event --> EventType
+Event --> Key
+
+' ===================== engine/src/audio =====================
+package "engine::audio" #E8F1FB {
+  interface AudioBackend {
+    + name() : string_view
+    + loadSound(wav) : SoundId
+    + playSound(sound, volume)
+    + startLayers(layers)
+    + setLayerVolume(layer, volume)
+  }
+  class AdaptiveMusic {
+    - thresholds : vector<float>
+    - volumes : vector<float>
+    - intensity : float
+    + AdaptiveMusic(layerThresholds)
+    + setIntensity(value)
+    + update(dt, backend)
+  }
+  enum AudioBackendType {
+    SdlCore
+    SdlMixer
+  }
+  class "createAudioBackend()" as AudioFactory <<function>> {
+    + returns unique_ptr<AudioBackend>
+  }
+}
+
+AdaptiveMusic ..> AudioBackend : setLayerVolume() >
+AudioFactory ..> AudioBackend : maakt >
+AudioFactory ..> AudioBackendType
+
+' ===================== sdl2/-mappen: alleen hier staat SDL =====================
+package "sdl2-implementatie (graphics/sdl2, input/sdl2, audio/sdl2)" #FDECEA {
+  class "Window::Impl" as WindowImpl {
+    + window : unique_ptr<SDL_Window>
+  }
+  class "Renderer::Impl" as RendererImpl {
+    + renderer : unique_ptr<SDL_Renderer>
+  }
+  class "Input.cpp" as SdlInput <<SDL_Event -> Event>>
+  class SdlCoreAudioBackend {
+    - device : SDL_AudioDeviceID
+    - sounds : vector<vector<int16>>
+    - voices : vector<Voice>
+    - layers : vector<Layer>
+    - layerPosition : size_t
+    - {static} audioCallback(userdata, stream, length)
+    - mix(output)
+  }
+  class SdlMixerAudioBackend {
+    - chunks : vector<unique_ptr<Mix_Chunk>>
+  }
+}
+
+Window *-- WindowImpl : pimpl
+Renderer *-- RendererImpl : pimpl
+PollEvent ..> SdlInput : geïmplementeerd in >
+SdlCoreAudioBackend ..|> AudioBackend
+SdlMixerAudioBackend ..|> AudioBackend
+AudioFactory ..> SdlCoreAudioBackend
+AudioFactory ..> SdlMixerAudioBackend
+
+' ===================== game/src =====================
+package "game" #EAF7EA {
+  class DemoApp {
+    - window : Window
+    - renderer : Renderer
+    - registry : Registry
+    - clock : Clock
+    - particleSystem : ParticleSystem
+    - effect : unique_ptr<Effect>
+    - audio : unique_ptr<AudioBackend>
+    - music : AdaptiveMusic
+    - mouse : Vec2
+    - level : int
+    + run()
+    - handleEvent(event)
+    - switchEffect(number)
+    - startAudio(type)
+    - updateTitle(dt)
+  }
+  abstract class Effect {
+    + {abstract} name() : string_view
+    + {abstract} update(registry, level, mouse)
+    + {abstract} intensity(registry) : float
+  }
+  class BoxesEffect {
+    - boxes : vector<Entity>
+    - random : mt19937
+    - spawnBox(registry, position) : Entity
+  }
+  class ParticleEffect {
+    - emitter : Entity
+    + ParticleEffect(registry)
+  }
+  class SoundGenerator <<functions>> {
+    + generateBeep() : vector<byte>
+    + generateLayers() : vector<vector<byte>>
+  }
+}
+
+BoxesEffect --|> Effect
+ParticleEffect --|> Effect
+DemoApp *-- Window
+DemoApp *-- Renderer
+DemoApp *-- Registry
+DemoApp *-- Clock
+DemoApp *-- ParticleSystem
+DemoApp *-- "1" Effect : huidig effect >
+DemoApp *-- "1" AudioBackend : actieve backend >
+DemoApp *-- AdaptiveMusic
+DemoApp ..> AudioFactory : createAudioBackend() >
+DemoApp ..> SoundGenerator
+DemoApp ..> PollEvent
+DemoApp ..> MovementSystem
+DemoApp ..> BounceSystem
+DemoApp ..> RenderSystem
+
+note bottom of WindowImpl
+  Pimpl: Window.h en Renderer.h bevatten geen SDL-types.
+  SDL wordt PRIVATE gelinkt aan engine, dus game/ kan SDL niet includen.
+end note
+@enduml
